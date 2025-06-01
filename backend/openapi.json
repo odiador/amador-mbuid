@@ -1,0 +1,239 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "version": "1.0.0",
+        "title": "AMABUID API",
+        "description": "API para Model-Based User Interface Development (MBUID)"
+    },
+    "servers": [
+        {
+            "url": "https://amabuid-backend.your-domain.workers.dev",
+            "description": "Producción"
+        },
+        {
+            "url": "http://localhost:8787",
+            "description": "Desarrollo local"
+        }
+    ],
+    "components": {
+        "schemas": {},
+        "parameters": {}
+    },
+    "paths": {
+        "/generar-ui": {
+            "post": {
+                "tags": [
+                    "UI Generation"
+                ],
+                "summary": "Generar interfaz de usuario desde modelo JSON",
+                "description": "Recibe un modelo JSON y lo transforma en una estructura de UI compatible con JSONForms",
+                "requestBody": {
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "modelo": {
+                                        "type": "object",
+                                        "properties": {
+                                            "titulo": {
+                                                "type": "string",
+                                                "minLength": 1
+                                            },
+                                            "descripcion": {
+                                                "type": "string"
+                                            },
+                                            "campos": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "tipo": {
+                                                            "type": "string",
+                                                            "enum": [
+                                                                "text",
+                                                                "number",
+                                                                "email",
+                                                                "select",
+                                                                "checkbox",
+                                                                "textarea"
+                                                            ]
+                                                        },
+                                                        "etiqueta": {
+                                                            "type": "string",
+                                                            "minLength": 1
+                                                        },
+                                                        "requerido": {
+                                                            "type": "boolean"
+                                                        },
+                                                        "opciones": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "placeholder": {
+                                                            "type": "string"
+                                                        }
+                                                    },
+                                                    "required": [
+                                                        "tipo",
+                                                        "etiqueta"
+                                                    ]
+                                                },
+                                                "minItems": 1
+                                            }
+                                        },
+                                        "required": [
+                                            "titulo",
+                                            "campos"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "modelo"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "UI generada exitosamente",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "jsonSchema": {
+                                            "type": "object",
+                                            "properties": {
+                                                "type": {
+                                                    "type": "string"
+                                                },
+                                                "title": {
+                                                    "type": "string"
+                                                },
+                                                "description": {
+                                                    "type": "string"
+                                                },
+                                                "properties": {
+                                                    "type": "object",
+                                                    "additionalProperties": {
+                                                        "nullable": true
+                                                    }
+                                                },
+                                                "required": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "string"
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "type",
+                                                "title",
+                                                "properties"
+                                            ]
+                                        },
+                                        "uiSchema": {
+                                            "type": "object",
+                                            "properties": {
+                                                "type": {
+                                                    "type": "string"
+                                                },
+                                                "elements": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "type": {
+                                                                "type": "string"
+                                                            },
+                                                            "label": {
+                                                                "type": "string"
+                                                            },
+                                                            "scope": {
+                                                                "type": "string"
+                                                            },
+                                                            "required": {
+                                                                "type": "boolean"
+                                                            },
+                                                            "options": {
+                                                                "type": "object",
+                                                                "properties": {
+                                                                    "detail": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "placeholder": {
+                                                                        "type": "string"
+                                                                    },
+                                                                    "enumOptions": {
+                                                                        "type": "array",
+                                                                        "items": {
+                                                                            "type": "object",
+                                                                            "properties": {
+                                                                                "value": {
+                                                                                    "type": "string"
+                                                                                },
+                                                                                "label": {
+                                                                                    "type": "string"
+                                                                                }
+                                                                            },
+                                                                            "required": [
+                                                                                "value",
+                                                                                "label"
+                                                                            ]
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "type",
+                                                            "label",
+                                                            "scope"
+                                                        ]
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "type",
+                                                "elements"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "jsonSchema",
+                                        "uiSchema"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Error de validación",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "error": {
+                                            "type": "string"
+                                        },
+                                        "details": {
+                                            "nullable": true
+                                        }
+                                    },
+                                    "required": [
+                                        "error"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
