@@ -1,182 +1,45 @@
-# AMABUID - Model-Based User Interface Development
+# AMABUID
 
 No more crashes. No more frustration. Just develop :).
 
-Una aplicación web para desarrollo de interfaces de usuario basadas en modelos JSON. Permite crear formularios dinámicos transformando modelos JSON en interfaces de usuario funcionales usando JSONForms.
 
-## 🚀 Características
+AMABUID es una aplicación web para crear interfaces de usuario dinámicas a partir de modelos JSON. Permite diseñar formularios y UIs de manera visual, validando y generando interfaces automáticamente.
 
-- **Backend**: Cloudflare Workers + Hono + TypeScript + Zod
-- **Frontend**: React + Vite + Tailwind CSS + JSONForms
-- **Editor JSON**: Monaco Editor integrado con validación en tiempo real
-- **Vista previa**: Renderización inmediata de la interfaz generada
-- **API OpenAPI**: Documentación automática de la API
-- **TypeScript**: Tipado completo en todo el proyecto
+## Características principales
+- Editor visual de modelos JSON con validación en tiempo real.
+- Renderizado inmediato de formularios usando JSONForms.
+- Backend serverless con Cloudflare Workers y API documentada.
+- Frontend moderno con React, Vite y Tailwind CSS.
 
-## 📁 Estructura del proyecto
+## Instalación rápida
+1. Clona el repositorio y entra a la carpeta:
+   ```powershell
+   git clone <url-del-repo>
+   cd amabuid
+   ```
+2. Instala las dependencias:
+   ```powershell
+   npm run install:all
+   ```
+3. Copia el archivo de entorno para el frontend:
+   ```powershell
+   type frontend\.env.example > frontend\.env.local
+   ```
+4. Ejecuta el entorno de desarrollo:
+   ```powershell
+   npm run dev
+   ```
 
-```
-amabuid/
-├── backend/                 # Cloudflare Worker con Hono
-│   ├── src/
-│   │   ├── index.ts        # Punto de entrada
-│   │   ├── handlers/       # Handlers de rutas
-│   │   ├── schemas/        # Validación y OpenAPI
-│   │   └── types/          # Tipos TypeScript
-│   ├── package.json
-│   ├── tsconfig.json
-│   └── wrangler.toml       # Configuración de Cloudflare
-├── frontend/               # App React
-│   ├── src/
-│   │   ├── components/     # Componentes React
-│   │   ├── hooks/          # Hooks personalizados
-│   │   ├── services/       # Cliente API
-│   │   └── types/          # Tipos compartidos
-│   ├── package.json
-│   └── vite.config.ts
-└── package.json            # Scripts de workspace
-```
+## Scripts útiles
+- `npm run dev` — Inicia backend y frontend juntos
+- `npm run build` — Compila todo el proyecto
+- `npm run deploy:backend` — Despliega el backend a Cloudflare Workers
 
-## 🛠️ Instalación y desarrollo local
+## Endpoints principales
+- `POST /generar-ui` — Genera la UI desde un modelo JSON
+- `GET /health` — Health check
 
-### Prerrequisitos
+## Licencia
+MIT
 
-- Node.js 18+ 
-- npm o yarn
-- Wrangler CLI (para Cloudflare Workers)
-
-### 1. Clonar el repositorio
-
-```bash
-git clone <url-del-repo>
-cd amabuid
-```
-
-### 2. Instalar dependencias
-
-```bash
-npm run install:all
-```
-
-### 3. Configurar variables de entorno
-
-```bash
-# Frontend
-cp frontend/.env.example frontend/.env.local
-```
-
-### 4. Desarrollo local
-
-```bash
-# Ejecutar backend y frontend simultáneamente
-npm run dev
-
-# O ejecutar por separado:
-npm run dev:backend   # Puerto 8787
-npm run dev:frontend  # Puerto 5173
-```
-
-## 🚀 Despliegue
-
-### Backend (Cloudflare Workers)
-
-```bash
-cd backend
-npm run deploy
-```
-
-### Frontend
-
-```bash
-cd frontend
-npm run build
-# Subir carpeta dist/ a tu servicio de hosting favorito
-```
-
-## 📖 Uso
-
-1. **Editar modelo JSON**: Usa el editor Monaco para crear tu modelo de formulario
-2. **Validación automática**: El JSON se valida en tiempo real
-3. **Generar interfaz**: Haz clic en "Generar interfaz" para crear la UI
-4. **Vista previa**: Interactúa con el formulario generado
-5. **Datos del formulario**: Ve los datos capturados en tiempo real
-
-### Ejemplo de modelo JSON
-
-```json
-{
-  "titulo": "Formulario de Contacto",
-  "descripcion": "Un formulario básico para recopilar información",
-  "campos": [
-    {
-      "tipo": "text",
-      "etiqueta": "Nombre completo",
-      "requerido": true,
-      "placeholder": "Ingresa tu nombre"
-    },
-    {
-      "tipo": "email",
-      "etiqueta": "Correo electrónico",
-      "requerido": true
-    },
-    {
-      "tipo": "select",
-      "etiqueta": "Categoría",
-      "opciones": ["Opción 1", "Opción 2", "Opción 3"]
-    },
-    {
-      "tipo": "textarea",
-      "etiqueta": "Mensaje",
-      "placeholder": "Escribe tu mensaje..."
-    },
-    {
-      "tipo": "checkbox",
-      "etiqueta": "Acepto los términos",
-      "requerido": true
-    }
-  ]
-}
-```
-
-## 🔧 Scripts disponibles
-
-```bash
-# Desarrollo
-npm run dev                # Backend + Frontend
-npm run dev:backend        # Solo backend
-npm run dev:frontend       # Solo frontend
-
-# Build
-npm run build             # Build completo
-npm run build:backend     # Build backend
-npm run build:frontend    # Build frontend
-
-# Despliegue
-npm run deploy:backend    # Deploy a Cloudflare Workers
-
-# Utilidades
-npm run type-check        # Verificar tipos TypeScript
-npm run install:all       # Instalar todas las dependencias
-```
-
-## 🌐 API Endpoints
-
-- `POST /generar-ui` - Generar interfaz desde modelo JSON
-- `GET /health` - Health check del backend
-- `GET /openapi.json` - Especificación OpenAPI
-
-## 🤝 Contribuir
-
-1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
-3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
-4. Push a la rama (`git push origin feature/AmazingFeature`)
-5. Abre un Pull Request
-
-## 📄 Licencia
-
-Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
-
-## 🛟 Soporte
-
-Si tienes preguntas o problemas, por favor abre un issue en el repositorio.
+Para más detalles técnicos, revisa el archivo `README_DETALLADO.md`.
