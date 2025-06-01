@@ -12,10 +12,19 @@ const app = new OpenAPIHono();
 app.use('*', logger());
 app.use('*', prettyJSON());
 app.use('*', cors({
-  origin: ['http://localhost:5173', 'http://localhost:3000'],
+  //   origin: ['http://localhost:5173', 'http://localhost:3000'],
+  origin: '*',
   allowHeaders: ['Content-Type'],
   allowMethods: ['GET', 'POST', 'OPTIONS'],
 }));
+
+app.options('*', (c) => {
+  return c.body(null, 204, {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
+  });
+});
 
 // Rutas principales
 app.get('/', (c) => {
@@ -54,10 +63,12 @@ app.doc('/openapi.json', {
 
 // Health check
 app.get('/health', (c) => {
+  // Acceso seguro a ENVIRONMENT para evitar error de TypeScript
+  const env = c.env as Record<string, any> | undefined;
   return c.json({ 
     status: 'ok',
     timestamp: new Date().toISOString(),
-    environment: c.env?.ENVIRONMENT || 'development',
+    environment: env?.ENVIRONMENT || 'development',
   });
 });
 
