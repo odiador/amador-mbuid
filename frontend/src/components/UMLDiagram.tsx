@@ -34,6 +34,7 @@ import {
   CompositionEdge,
   InheritanceEdge
 } from './CustomEdges';
+import { calculateClosestHandles } from '../utils/handleOptimizer';
 
 // Tipos de nodos personalizados
 const nodeTypes = {
@@ -52,14 +53,29 @@ const edgeTypes = {
 };
 
 // Función para convertir UMLRelation a React Flow Edge con estilos específicos
-const relationToEdge = (relation: UMLRelation, isSelected: boolean = false): Edge => {
+const relationToEdge = (relation: UMLRelation, isSelected: boolean = false, classes?: UMLClass[]): Edge => {
+  // Si no hay handles específicos y tenemos las clases disponibles, calcular los más cercanos
+  let sourceHandle = relation.sourceHandle;
+  let targetHandle = relation.targetHandle;
+  
+  if ((!sourceHandle || !targetHandle) && classes) {
+    const sourceNode = classes.find(c => c.id === relation.source);
+    const targetNode = classes.find(c => c.id === relation.target);
+    
+    if (sourceNode && targetNode) {
+      const closest = calculateClosestHandles(sourceNode, targetNode);
+      sourceHandle = sourceHandle || closest.sourceHandle;
+      targetHandle = targetHandle || closest.targetHandle;
+    }
+  }
+
   const baseEdge: Edge = {
     id: relation.id,
     source: relation.source,
     target: relation.target,
-    // Usar handles específicos si están disponibles
-    sourceHandle: relation.sourceHandle,
-    targetHandle: relation.targetHandle,
+    // Usar handles calculados o específicos
+    sourceHandle: sourceHandle,
+    targetHandle: targetHandle,
     label: relation.label || '',
     selected: isSelected,
     labelStyle: { 
@@ -326,6 +342,27 @@ export default function UMLDiagram() {
     // selectedEdge será actualizado automáticamente por el useEffect
   }, []);
 
+  // Función para recalcular automáticamente los handles de todas las relaciones
+  const recalculateAllHandles = useCallback(() => {
+    setRelations(prev => 
+      prev.map(relation => {
+        const sourceNode = classes.find(c => c.id === relation.source);
+        const targetNode = classes.find(c => c.id === relation.target);
+        
+        if (sourceNode && targetNode) {
+          const closest = calculateClosestHandles(sourceNode, targetNode);
+          return {
+            ...relation,
+            sourceHandle: closest.sourceHandle,
+            targetHandle: closest.targetHandle
+          };
+        }
+        
+        return relation;
+      })
+    );
+  }, [classes]);
+
   // Función separada para manejar cambios de dimensiones cuando termine el resize
   const handleResizeEnd = useCallback((nodeId: string, dimensions: { width: number; height: number }) => {
     setClasses(prev => 
@@ -341,7 +378,10 @@ export default function UMLDiagram() {
           : cls
       )
     );
-  }, []);
+    
+    // Recalcular handles después de redimensionar
+    setTimeout(() => recalculateAllHandles(), 100);
+  }, [recalculateAllHandles]);
 
   // Sincronizar clases con nodos de ReactFlow - usar React.useMemo para evitar recálculos
   const reactFlowNodes = React.useMemo(() => {
@@ -373,9 +413,9 @@ export default function UMLDiagram() {
   // Sincronizar relaciones con edges - usar React.useMemo para evitar recálculos
   const reactFlowEdges = React.useMemo(() => {
     return relations.map(relation => 
-      relationToEdge(relation, selectedEdgeId === relation.id)
+      relationToEdge(relation, selectedEdgeId === relation.id, classes)
     );
-  }, [relations, selectedEdgeId]);
+  }, [relations, selectedEdgeId, classes]);
 
   // Efectos para actualizar estados - Simplificado para evitar bucles
   React.useEffect(() => {
@@ -398,6 +438,8 @@ export default function UMLDiagram() {
       // Aplicar cambios a los nodos de ReactFlow primero
       setNodes((nds) => applyNodeChanges(changes, nds));
       
+      let shouldRecalculateHandles = false;
+      
       // Sincronizar solo cambios que NO causarán re-render del useEffect
       changes.forEach(change => {
         if (change.type === 'position' && change.position) {
@@ -408,6 +450,7 @@ export default function UMLDiagram() {
                 : cls
             )
           );
+          shouldRecalculateHandles = true;
         } else if (change.type === 'select') {
           // Manejar selección de nodos
           if (change.selected) {
@@ -420,8 +463,13 @@ export default function UMLDiagram() {
         // REMOVIDO: dimension changes para evitar loop infinito
         // Las dimensiones se sincronizarán cuando termine el resize
       });
+      
+      // Recalcular handles si algún nodo se movió
+      if (shouldRecalculateHandles) {
+        setTimeout(() => recalculateAllHandles(), 50);
+      }
     },
-    [selectedNodeId]
+    [selectedNodeId, recalculateAllHandles]
   );
 
   const onEdgesChange = useCallback(
@@ -475,6 +523,20 @@ export default function UMLDiagram() {
   const onConnect = useCallback(
     (connection: Connection) => {
       if (connection.source && connection.target) {
+        // Encontrar los nodos origen y destino
+        const sourceNode = classes.find(c => c.id === connection.source);
+        const targetNode = classes.find(c => c.id === connection.target);
+        
+        // Calcular handles más cercanos si no se especificaron o si los nodos existen
+        let sourceHandle = connection.sourceHandle;
+        let targetHandle = connection.targetHandle;
+        
+        if (sourceNode && targetNode) {
+          const closest = calculateClosestHandles(sourceNode, targetNode);
+          sourceHandle = sourceHandle || closest.sourceHandle;
+          targetHandle = targetHandle || closest.targetHandle;
+        }
+
         const newRelation: UMLRelation = {
           id: `rel_${Date.now()}`,
           type: 'association',
@@ -483,15 +545,15 @@ export default function UMLDiagram() {
           label: '',
           sourceCardinality: '',
           targetCardinality: '',
-          // Capturar información de handles específicos
-          sourceHandle: connection.sourceHandle || undefined,
-          targetHandle: connection.targetHandle || undefined
+          // Usar handles calculados o específicos
+          sourceHandle: sourceHandle || undefined,
+          targetHandle: targetHandle || undefined
         };
         
         setRelations(prev => [...prev, newRelation]);
       }
     },
-    []
+    [classes]
   );
 
   // Función para verificar si se permite la conexión
