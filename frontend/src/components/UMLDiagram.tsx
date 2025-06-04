@@ -1,39 +1,45 @@
 import React, { useCallback, useState } from 'react';
-import ReactFlow, { 
-  Background, 
-  Controls, 
-  Node, 
-  Edge, 
-  Connection, 
-  NodeChange, 
-  EdgeChange, 
-  MarkerType 
+import ReactFlow, {
+  Background,
+  Connection,
+  Controls,
+  Edge,
+  EdgeChange,
+  MarkerType,
+  Node,
+  NodeChange,
+  applyNodeChanges,
+  applyEdgeChanges
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { UMLClass, UMLRelation, UMLModel } from '../types/uml';
+import { UMLClass, UMLModel, UMLRelation } from '../types/uml';
+import {
+  createUMLAttribute,
+  createUMLMethod,
+  formatAttribute,
+  formatMethod,
+  parseAttributeFromString,
+  parseMethodFromString,
+  PRIMITIVE_TYPES
+} from '../utils/umlHelpers';
 import { CodeGenerator } from './CodeGenerator';
 import { RelationshipPanel } from './RelationshipPanel';
+import ResizableUMLNode from './ResizableUMLNode';
 
-// Función para crear el contenido visual de una clase UML
-const formatClassContent = (umlClass: UMLClass) => {
-  let content = umlClass.name;
-  if (umlClass.attributes.length > 0) {
-    content += '\n---\n' + umlClass.attributes.join('\n');
-  }
-  if (umlClass.methods.length > 0) {
-    content += '\n---\n' + umlClass.methods.join('\n');
-  }
-  return content;
+// Tipos de nodos personalizados
+const nodeTypes = {
+  umlClass: ResizableUMLNode,
 };
 
 // Función para convertir UMLRelation a React Flow Edge con estilos específicos
-const relationToEdge = (relation: UMLRelation): Edge => {
+const relationToEdge = (relation: UMLRelation, isSelected: boolean = false): Edge => {
   const baseEdge: Edge = {
     id: relation.id,
     source: relation.source,
     target: relation.target,
     label: relation.label || '',
-    type: 'default'
+    type: 'default',
+    selected: isSelected
   };
 
   // Configurar estilos según el tipo de relación UML
@@ -110,23 +116,51 @@ const initialClasses: UMLClass[] = [
   {
     id: '1',
     name: 'Person',
-    attributes: ['name: string', 'age: number', 'email: string'],
-    methods: ['getName(): string', 'setAge(age: number): void', 'getEmail(): string'],
-    position: { x: 250, y: 150 }
+    attributes: [
+      createUMLAttribute('name', 'string'),
+      createUMLAttribute('age', 'int'),
+      createUMLAttribute('email', 'string')
+    ],
+    methods: [
+      createUMLMethod('getName', 'string'),
+      createUMLMethod('setAge', 'void', 'public', [{name: 'age', type: 'int'}]),
+      createUMLMethod('getEmail', 'string')
+    ],
+    position: { x: 250, y: 150 },
+    dimensions: { width: 200, height: 180 }
   },
   {
     id: '2',
     name: 'Student',
-    attributes: ['studentId: string', 'grade: float', 'isActive: boolean'],
-    methods: ['getStudentId(): string', 'setGrade(grade: float): void', 'isEnrolled(): boolean'],
-    position: { x: 550, y: 150 }
+    attributes: [
+      createUMLAttribute('studentId', 'string'),
+      createUMLAttribute('grade', 'float'),
+      createUMLAttribute('isActive', 'boolean')
+    ],
+    methods: [
+      createUMLMethod('getStudentId', 'string'),
+      createUMLMethod('setGrade', 'void', 'public', [{name: 'grade', type: 'float'}]),
+      createUMLMethod('isEnrolled', 'boolean')
+    ],
+    position: { x: 550, y: 150 },
+    dimensions: { width: 220, height: 200 }
   },
   {
     id: '3',
     name: 'Course',
-    attributes: ['code: string', 'title: string', 'credits: int', 'startDate: Date'],
-    methods: ['getCode(): string', 'getCredits(): int', 'getDuration(): int'],
-    position: { x: 400, y: 350 }
+    attributes: [
+      createUMLAttribute('code', 'string'),
+      createUMLAttribute('title', 'string'),
+      createUMLAttribute('credits', 'int'),
+      createUMLAttribute('startDate', 'Date')
+    ],
+    methods: [
+      createUMLMethod('getCode', 'string'),
+      createUMLMethod('getCredits', 'int'),
+      createUMLMethod('getDuration', 'int')
+    ],
+    position: { x: 400, y: 350 },
+    dimensions: { width: 240, height: 220 }
   }
 ];
 
@@ -159,32 +193,44 @@ export default function UMLDiagram() {
   const [newAttribute, setNewAttribute] = useState('');
   const [newMethod, setNewMethod] = useState('');
 
-  // Tipos primitivos comunes para sugerencias
-  const primitiveTypes = ['string', 'int', 'float', 'double', 'boolean', 'Date', 'char', 'byte', 'long'];
+  // Estado separado para los nodos de ReactFlow
+  const [nodes, setNodes] = useState<Node[]>([]);
+  const [edges, setEdges] = useState<Edge[]>([]);
 
-  // Convertir clases a nodos con posiciones sincronizadas
-  const nodes: Node[] = classes.map((umlClass) => ({
-    id: umlClass.id,
-    type: 'default',
-    position: umlClass.position,
-    data: { label: formatClassContent(umlClass) },
-    style: {
-      background: '#fff',
-      border: '2px solid #e5e7eb',
-      borderRadius: 8,
-      padding: 20,
-      fontSize: 14,
-      fontFamily: 'monospace',
-      whiteSpace: 'pre-line',
-      textAlign: 'left',
-      minWidth: 200,
-      color: '#374151'
-    },
-    draggable: true
-  }));
+  // Sincronizar clases con nodos de ReactFlow
+  React.useEffect(() => {
+    const reactFlowNodes: Node[] = classes.map((umlClass) => ({
+      id: umlClass.id,
+      type: 'umlClass',
+      position: umlClass.position,
+      data: { 
+        umlClass,
+        isSelected: selectedNodeId === umlClass.id 
+      },
+      style: {
+        width: umlClass.dimensions?.width || 200,
+        height: umlClass.dimensions?.height || 150,
+      },
+      selected: selectedNodeId === umlClass.id,
+      draggable: true,
+      resizeHandleStyle: {
+        background: '#3b82f6',
+        border: '2px solid #fff',
+        borderRadius: '50%',
+        width: '8px',
+        height: '8px'
+      }
+    }));
+    setNodes(reactFlowNodes);
+  }, [classes, selectedNodeId]);
 
-  // Convertir relaciones a edges con estilos
-  const edges: Edge[] = relations.map(relationToEdge);
+  // Sincronizar relaciones con edges
+  React.useEffect(() => {
+    const reactFlowEdges: Edge[] = relations.map(relation => 
+      relationToEdge(relation, selectedEdgeId === relation.id)
+    );
+    setEdges(reactFlowEdges);
+  }, [relations, selectedEdgeId]);
 
   // Obtener la clase seleccionada
   const selectedClass = selectedNodeId ? classes.find(c => c.id === selectedNodeId) : null;
@@ -195,9 +241,15 @@ export default function UMLDiagram() {
   // Manejadores de cambios en nodos y edges
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      // Sincronizar posiciones con el estado de las clases cuando se mueven
+      console.log('Node changes:', changes);
+      
+      // Aplicar cambios a los nodos de ReactFlow primero
+      setNodes((nds) => applyNodeChanges(changes, nds));
+      
+      // Sincronizar cambios importantes con el estado de clases
       changes.forEach(change => {
         if (change.type === 'position' && change.position) {
+          console.log('Position change:', change.id, change.position);
           setClasses(prev => 
             prev.map(cls => 
               cls.id === change.id 
@@ -205,20 +257,76 @@ export default function UMLDiagram() {
                 : cls
             )
           );
+        } else if (change.type === 'dimensions' && change.dimensions) {
+          // Manejar cambios de redimensionamiento
+          console.log('Dimensions change:', change.id, change.dimensions);
+          setClasses(prev => 
+            prev.map(cls => 
+              cls.id === change.id 
+                ? { 
+                    ...cls, 
+                    dimensions: { 
+                      width: Math.round(change.dimensions!.width), 
+                      height: Math.round(change.dimensions!.height) 
+                    } 
+                  }
+                : cls
+            )
+          );
+        } else if (change.type === 'select') {
+          // Manejar selección de nodos
+          if (change.selected) {
+            setSelectedNodeId(change.id);
+            setSelectedEdgeId(null);
+          } else if (selectedNodeId === change.id) {
+            setSelectedNodeId(null);
+          }
         }
       });
     },
-    []
+    [selectedNodeId]
   );
 
   const onEdgesChange = useCallback(
-    (_changes: EdgeChange[]) => {
-      // Manejar cambios en edges si es necesario
+    (changes: EdgeChange[]) => {
+      console.log('Edge changes:', changes);
+      
+      // Aplicar cambios a los edges de ReactFlow
+      setEdges((eds) => applyEdgeChanges(changes, eds));
+      
+      // Manejar cambios en edges, incluyendo selección
+      changes.forEach(change => {
+        if (change.type === 'select') {
+          if (change.selected) {
+            setSelectedEdgeId(change.id);
+            setSelectedNodeId(null);
+          } else if (selectedEdgeId === change.id) {
+            setSelectedEdgeId(null);
+          }
+        }
+      });
+    },
+    [selectedEdgeId]
+  );
+
+  // Manejar cambios de selección
+  const onSelectionChange = useCallback(
+    ({ nodes, edges }: { nodes: Node[]; edges: Edge[] }) => {
+      if (nodes.length > 0) {
+        setSelectedNodeId(nodes[0].id);
+        setSelectedEdgeId(null);
+      } else if (edges.length > 0) {
+        setSelectedEdgeId(edges[0].id);
+        setSelectedNodeId(null);
+      } else {
+        setSelectedNodeId(null);
+        setSelectedEdgeId(null);
+      }
     },
     []
   );
 
-  // Manejar conexiones (crear nuevas relaciones)
+  // Manejar conexiones solo cuando es apropiado (no con clic normal)
   const onConnect = useCallback(
     (connection: Connection) => {
       if (connection.source && connection.target) {
@@ -234,6 +342,17 @@ export default function UMLDiagram() {
         
         setRelations(prev => [...prev, newRelation]);
       }
+    },
+    []
+  );
+
+  // Función para verificar si se permite la conexión
+  const isValidConnection = useCallback(
+    (connection: Connection) => {
+      // Solo permitir conexiones si la fuente y destino están definidos
+      return connection.source !== connection.target && 
+             connection.source !== null && 
+             connection.target !== null;
     },
     []
   );
@@ -255,12 +374,21 @@ export default function UMLDiagram() {
     const newClass: UMLClass = {
       id: Date.now().toString(),
       name: 'NewClass',
-      attributes: ['id: int', 'name: string', 'active: boolean'],
-      methods: ['getId(): int', 'setName(name: string): void', 'isActive(): boolean'],
+      attributes: [
+        createUMLAttribute('id', 'int'),
+        createUMLAttribute('name', 'string'),
+        createUMLAttribute('active', 'boolean')
+      ],
+      methods: [
+        createUMLMethod('getId', 'int'),
+        createUMLMethod('setName', 'void', 'public', [{name: 'name', type: 'string'}]),
+        createUMLMethod('isActive', 'boolean')
+      ],
       position: { 
         x: Math.random() * 400 + 200, 
         y: Math.random() * 300 + 100 
-      }
+      },
+      dimensions: { width: 200, height: 180 }
     };
     setClasses([...classes, newClass]);
   };
@@ -277,9 +405,10 @@ export default function UMLDiagram() {
   // Agregar atributo
   const addAttribute = () => {
     if (selectedClass && newAttribute.trim()) {
+      const newAttr = parseAttributeFromString(newAttribute.trim());
       setClasses(classes.map(c =>
         c.id === selectedClass.id 
-          ? { ...c, attributes: [...c.attributes, newAttribute.trim()] }
+          ? { ...c, attributes: [...c.attributes, newAttr] }
           : c
       ));
       setNewAttribute('');
@@ -300,9 +429,10 @@ export default function UMLDiagram() {
   // Agregar método
   const addMethod = () => {
     if (selectedClass && newMethod.trim()) {
+      const newMeth = parseMethodFromString(newMethod.trim());
       setClasses(classes.map(c =>
         c.id === selectedClass.id
-          ? { ...c, methods: [...c.methods, newMethod.trim()] }
+          ? { ...c, methods: [...c.methods, newMeth] }
           : c
       ));
       setNewMethod('');
@@ -347,7 +477,15 @@ export default function UMLDiagram() {
   const exportUMLModel = () => {
     const umlModel: UMLModel = {
       classes,
-      relations
+      relations,
+      version: '2.0',
+      metadata: {
+        title: 'UML Diagram',
+        description: 'Generated UML model with formal structure',
+        author: 'AMABUID',
+        createdAt: new Date().toISOString(),
+        lastModified: new Date().toISOString()
+      }
     };
     
     const dataStr = JSON.stringify(umlModel, null, 2);
@@ -416,17 +554,48 @@ export default function UMLDiagram() {
         <ReactFlow
           nodes={nodes}
           edges={edges}
+          nodeTypes={nodeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
           onNodeClick={onNodeClick}
           onEdgeClick={onEdgeClick}
+          onSelectionChange={onSelectionChange}
+          isValidConnection={isValidConnection}
           style={{ background: '#f9fafb' }}
+          nodesDraggable={true}
+          nodesConnectable={true}
+          elementsSelectable={true}
+          snapToGrid={true}
+          snapGrid={[15, 15]}
           fitView
+          attributionPosition="bottom-left"
         >
           <Controls />
           <Background />
         </ReactFlow>
+
+        {/* Panel de Debug Temporal */}
+        {selectedClass && (
+          <div style={{
+            position: 'absolute',
+            bottom: 10,
+            right: 10,
+            background: 'rgba(0,0,0,0.8)',
+            color: 'white',
+            padding: '10px',
+            borderRadius: '8px',
+            fontSize: '12px',
+            maxWidth: '300px',
+            zIndex: 1000
+          }}>
+            <div><strong>Debug Info:</strong></div>
+            <div>Selected: {selectedClass.name}</div>
+            <div>Dimensions: {selectedClass.dimensions?.width || 'undefined'} x {selectedClass.dimensions?.height || 'undefined'}</div>
+            <div>Position: {selectedClass.position.x}, {selectedClass.position.y}</div>
+            <div>Node Count: {nodes.length}</div>
+          </div>
+        )}
 
         {/* Botones de acción */}
         <div style={{ 
@@ -484,6 +653,18 @@ export default function UMLDiagram() {
               style={{ display: 'none' }}
             />
           </label>
+
+          {/* Botón de instrucciones */}
+          <div style={{
+            background: '#f59e0b',
+            color: 'white',
+            padding: '8px 12px',
+            borderRadius: 4,
+            fontSize: 12,
+            maxWidth: '200px'
+          }}>
+            💡 Selecciona un nodo y arrastra las esquinas azules para redimensionar
+          </div>
         </div>
       </div>
 
@@ -529,7 +710,7 @@ export default function UMLDiagram() {
             <div style={{ marginBottom: 10 }}>
               <div style={{ fontSize: 12, color: '#6b7280', marginBottom: 5 }}>Tipos comunes:</div>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
-                {primitiveTypes.map(type => (
+                {PRIMITIVE_TYPES.map(type => (
                   <button
                     key={type}
                     onClick={() => setNewAttribute(`field: ${type}`)}
@@ -590,7 +771,7 @@ export default function UMLDiagram() {
                   fontFamily: 'monospace',
                   fontSize: 13 
                 }}>
-                  {attr}
+                  {formatAttribute(attr)}
                 </span>
                 <button
                   onClick={() => removeAttribute(index)}
@@ -656,7 +837,7 @@ export default function UMLDiagram() {
                   fontFamily: 'monospace',
                   fontSize: 13 
                 }}>
-                  {method}
+                  {formatMethod(method)}
                 </span>
                 <button
                   onClick={() => removeMethod(index)}

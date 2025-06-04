@@ -44,3 +44,56 @@ body {
 .animate-fadeIn {
   animation: fadeIn 0.3s ease-out;
 }
+
+/* Estilos para el NodeResizer */
+.custom-resize-handle {
+  background: #3b82f6 !important;
+  border: 2px solid #fff !important;
+  border-radius: 3px !important;
+  width: 12px !important;
+  height: 12px !important;
+  cursor: nw-resize !important;
+  z-index: 100 !important;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.2) !important;
+}
+
+.custom-resize-handle:hover {
+  background: #2563eb !important;
+  transform: scale(1.1) !important;
+}
+
+.custom-resize-line {
+  border-color: #3b82f6 !important;
+  border-width: 2px !important;
+  z-index: 99 !important;
+}
+
+/* Estilos para ReactFlow */
+.react-flow__node-umlClass {
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.react-flow__node-umlClass.selected {
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+/* Separar connection handles de resize handles */
+.react-flow__handle {
+  z-index: 50 !important;
+  transition: all 0.2s ease !important;
+  pointer-events: auto !important;
+}
+
+.react-flow__handle:hover {
+  transform: scale(1.2) !important;
+}
+
+/* Asegurar que el NodeResizer tenga prioridad */
+.react-flow__resize-control {
+  z-index: 100 !important;
+}
+
+.react-flow__resize-control.handle {
+  z-index: 101 !important;
+}

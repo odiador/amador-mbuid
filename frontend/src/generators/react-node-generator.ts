@@ -6,58 +6,70 @@ const toCamelCase = (str: string) => str.charAt(0).toLowerCase() + str.slice(1);
 const toPascalCase = (str: string) => str.charAt(0).toUpperCase() + str.slice(1);
 const toKebabCase = (str: string) => str.replace(/([a-z])([A-Z])/g, '$1-$2').toLowerCase();
 
-// Parsear atributos UML a TypeScript
-const parseAttribute = (attr: string) => {
-  const parts = attr.split(':').map(p => p.trim());
-  return {
-    name: parts[0] || 'field',
-    type: parts[1] || 'string'
+// Mapear tipos UML a TypeScript
+const mapUMLTypeToTypeScript = (umlType: string): string => {
+  const typeMap: Record<string, string> = {
+    'string': 'string',
+    'int': 'number',
+    'integer': 'number',
+    'float': 'number',
+    'double': 'number',
+    'boolean': 'boolean',
+    'Date': 'Date',
+    'char': 'string',
+    'byte': 'number',
+    'long': 'number',
+    'void': 'void'
   };
+  return typeMap[umlType] || 'any';
 };
 
-// Parsear métodos UML
-const parseMethod = (method: string) => {
-  const name = method.replace(/\(\).*$/, '').trim();
-  return {
-    name: name || 'method',
-    returnType: 'void'
-  };
+// Obtener valor por defecto para un tipo
+const getDefaultValue = (type: string): string => {
+  const tsType = mapUMLTypeToTypeScript(type);
+  switch (tsType) {
+    case 'string': return "''";
+    case 'number': return '0';
+    case 'boolean': return 'false';
+    case 'Date': return 'new Date()';
+    default: return 'null';
+  }
 };
 
 // Generar modelo TypeScript para Node.js
 const generateNodeModel = (umlClass: UMLClass): string => {
   const className = toPascalCase(umlClass.name);
-  const attributes = umlClass.attributes.map(parseAttribute);
   
   let code = `// ${className} Model\n`;
   code += `export interface I${className} {\n`;
   
-  attributes.forEach(attr => {
-    code += `  ${attr.name}: ${attr.type};\n`;
+  umlClass.attributes.forEach(attr => {
+    const tsType = mapUMLTypeToTypeScript(attr.type);
+    code += `  ${attr.name}: ${tsType};\n`;
   });
   
   code += `}\n\n`;
   code += `export class ${className} implements I${className} {\n`;
   
   // Propiedades
-  attributes.forEach(attr => {
-    code += `  ${attr.name}: ${attr.type};\n`;
+  umlClass.attributes.forEach(attr => {
+    const tsType = mapUMLTypeToTypeScript(attr.type);
+    code += `  ${attr.name}: ${tsType};\n`;
   });
   
   code += `\n  constructor(data: Partial<I${className}> = {}) {\n`;
-  attributes.forEach(attr => {
-    const defaultValue = attr.type === 'string' ? "''" : 
-                        attr.type === 'number' ? '0' : 
-                        attr.type === 'boolean' ? 'false' : 'null';
+  umlClass.attributes.forEach(attr => {
+    const defaultValue = getDefaultValue(attr.type);
     code += `    this.${attr.name} = data.${attr.name} ?? ${defaultValue};\n`;
   });
   code += `  }\n\n`;
   
   // Métodos
   umlClass.methods.forEach(method => {
-    const parsedMethod = parseMethod(method);
-    code += `  ${parsedMethod.name}(): ${parsedMethod.returnType} {\n`;
-    code += `    // TODO: Implementar ${parsedMethod.name}\n`;
+    const returnType = mapUMLTypeToTypeScript(method.returnType);
+    const params = method.parameters.map(p => `${p.name}: ${mapUMLTypeToTypeScript(p.type)}`).join(', ');
+    code += `  ${method.name}(${params}): ${returnType} {\n`;
+    code += `    // TODO: Implementar ${method.name}\n`;
     code += `    throw new Error('Method not implemented');\n`;
     code += `  }\n\n`;
   });
@@ -70,7 +82,6 @@ const generateNodeModel = (umlClass: UMLClass): string => {
 const generateReactComponent = (umlClass: UMLClass): string => {
   const className = toPascalCase(umlClass.name);
   const componentName = `${className}Component`;
-  const attributes = umlClass.attributes.map(parseAttribute);
   
   let code = `import React, { useState } from 'react';\n`;
   code += `import { ${className}, I${className} } from '../models/${className}';\n\n`;
@@ -98,25 +109,26 @@ const generateReactComponent = (umlClass: UMLClass): string => {
   code += `      <h2>${className}</h2>\n`;
   code += `      <form onSubmit={handleSubmit}>\n`;
   
-  attributes.forEach(attr => {
+  umlClass.attributes.forEach(attr => {
+    const tsType = mapUMLTypeToTypeScript(attr.type);
     code += `        <div className="form-group">\n`;
     code += `          <label htmlFor="${attr.name}">${toPascalCase(attr.name)}:</label>\n`;
     
-    if (attr.type === 'string') {
+    if (tsType === 'string') {
       code += `          <input\n`;
       code += `            type="text"\n`;
       code += `            id="${attr.name}"\n`;
       code += `            value={formData.${attr.name}}\n`;
       code += `            onChange={(e) => handleChange('${attr.name}', e.target.value)}\n`;
       code += `          />\n`;
-    } else if (attr.type === 'number') {
+    } else if (tsType === 'number') {
       code += `          <input\n`;
       code += `            type="number"\n`;
       code += `            id="${attr.name}"\n`;
       code += `            value={formData.${attr.name}}\n`;
       code += `            onChange={(e) => handleChange('${attr.name}', Number(e.target.value))}\n`;
       code += `          />\n`;
-    } else if (attr.type === 'boolean') {
+    } else if (tsType === 'boolean') {
       code += `          <input\n`;
       code += `            type="checkbox"\n`;
       code += `            id="${attr.name}"\n`;

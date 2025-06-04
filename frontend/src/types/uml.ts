@@ -1,9 +1,47 @@
+// Tipos de datos primitivos soportados
+export type PrimitiveType = 'string' | 'int' | 'float' | 'double' | 'boolean' | 'Date' | 'char' | 'byte' | 'long' | 'void';
+
+// Visibilidad de atributos y métodos
+export type Visibility = 'public' | 'private' | 'protected' | 'package';
+
+// Interfaz para atributos estructurados
+export interface UMLAttribute {
+  id: string;
+  name: string;
+  type: string;
+  visibility: Visibility;
+  isStatic?: boolean;
+  isReadonly?: boolean;
+  defaultValue?: string;
+}
+
+// Interfaz para métodos estructurados
+export interface UMLMethod {
+  id: string;
+  name: string;
+  returnType: string;
+  visibility: Visibility;
+  isStatic?: boolean;
+  isAbstract?: boolean;
+  parameters: UMLParameter[];
+}
+
+// Interfaz para parámetros de métodos
+export interface UMLParameter {
+  name: string;
+  type: string;
+  defaultValue?: string;
+}
+
 export interface UMLClass {
   id: string;
   name: string;
-  attributes: string[];
-  methods: string[];
+  attributes: UMLAttribute[];
+  methods: UMLMethod[];
   position: { x: number; y: number };
+  dimensions?: { width: number; height: number };
+  isAbstract?: boolean;
+  stereotype?: string;
 }
 
 export interface UMLRelation {
@@ -19,4 +57,12 @@ export interface UMLRelation {
 export interface UMLModel {
   classes: UMLClass[];
   relations: UMLRelation[];
+  version: string;
+  metadata?: {
+    title?: string;
+    description?: string;
+    author?: string;
+    createdAt?: string;
+    lastModified?: string;
+  };
 }
