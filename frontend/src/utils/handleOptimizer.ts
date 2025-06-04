@@ -59,3 +59,51 @@ export function calculateClosestHandles(
   }
   return { sourceHandle, targetHandle };
 }
+
+/**
+ * Encuentra el handle más cercano a un punto dado para un nodo UML.
+ * @param node El nodo UML
+ * @param point El punto {x, y} al que buscar el handle más cercano
+ * @param type 'source' | 'target'
+ * @returns El id del handle más cercano (ej: 'right-2', 'top-1', etc.)
+ */
+export function getClosestHandleToPoint(
+  node: UMLClass,
+  point: { x: number; y: number },
+  type: 'source' | 'target' = 'source'
+): string {
+  // Define los offsets relativos de los 3 handles por lado
+  const sides = [
+    { side: 'top',    positions: [0.25, 0.5, 0.75], axis: 'x', fixed: 'y', value: 0 },
+    { side: 'right',  positions: [0.25, 0.5, 0.75], axis: 'y', fixed: 'x', value: (node.dimensions?.width || 200) },
+    { side: 'bottom', positions: [0.25, 0.5, 0.75], axis: 'x', fixed: 'y', value: (node.dimensions?.height || 150) },
+    { side: 'left',   positions: [0.25, 0.5, 0.75], axis: 'y', fixed: 'x', value: 0 }
+  ];
+  const handles: { id: string; x: number; y: number }[] = [];
+  for (const s of sides) {
+    s.positions.forEach((pos, idx) => {
+      const id = s.side + '-' + (idx + 1);
+      const x = s.axis === 'x'
+        ? node.position.x + (node.dimensions?.width || 200) * pos
+        : node.position.x + s.value;
+      const y = s.axis === 'y'
+        ? node.position.y + (node.dimensions?.height || 150) * pos
+        : node.position.y + s.value;
+      handles.push({
+        id: type === 'target' ? `target-${id}` : id,
+        x, y
+      });
+    });
+  }
+  // Encuentra el handle más cercano al punto
+  let minDist = Infinity;
+  let closest = handles[0].id;
+  for (const h of handles) {
+    const dist = Math.hypot(h.x - point.x, h.y - point.y);
+    if (dist < minDist) {
+      minDist = dist;
+      closest = h.id;
+    }
+  }
+  return closest;
+}

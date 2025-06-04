@@ -34,7 +34,8 @@ import {
   CompositionEdge,
   InheritanceEdge
 } from './CustomEdges';
-import { calculateClosestHandles } from '../utils/handleOptimizer';
+import { calculateClosestHandles, getClosestHandleToPoint } from '../utils/handleOptimizer';
+import ELK from 'elkjs/lib/elk.bundled.js';
 
 // Tipos de nodos personalizados
 const nodeTypes = {
@@ -758,6 +759,54 @@ export default function UMLDiagram() {
     event.target.value = '';
   };
 
+  // Función para ejecutar ELK y actualizar posiciones y handles
+  const runElkLayoutAndUpdateHandles = useCallback(async () => {
+    const elk = new ELK();
+    const elkGraph = {
+      id: 'root',
+      layoutOptions: { 'elk.algorithm': 'layered', 'elk.direction': 'RIGHT' },
+      children: classes.map(cls => ({
+        id: cls.id,
+        width: cls.dimensions?.width || 200,
+        height: cls.dimensions?.height || 150
+      })),
+      edges: relations.map(rel => ({
+        id: rel.id,
+        sources: [rel.source],
+        targets: [rel.target]
+      }))
+    };
+    const elkResult = await elk.layout(elkGraph);
+    // Calcular el nuevo array de nodos con posiciones ELK
+    const updatedClasses = classes.map(cls => {
+      const elkNode = (elkResult.children || []).find((n: any) => n.id === cls.id);
+      return elkNode
+        ? { ...cls, position: { x: elkNode.x ?? cls.position.x, y: elkNode.y ?? cls.position.y } }
+        : cls;
+    });
+    setClasses(updatedClasses);
+    // Actualizar handles óptimos para cada relación usando los nodos ya actualizados
+    setRelations(prev => prev.map(rel => {
+      const elkEdge = (elkResult.edges || []).find((e: any) => e.id === rel.id) as any;
+      if (!elkEdge || !elkEdge.sections || !elkEdge.sections[0]) return rel;
+      const section = elkEdge.sections[0];
+      const sourceNode = updatedClasses.find(c => c.id === rel.source);
+      const targetNode = updatedClasses.find(c => c.id === rel.target);
+      if (!sourceNode || !targetNode) return rel;
+      const sourceHandle = getClosestHandleToPoint(
+        sourceNode,
+        { x: section.startPoint.x, y: section.startPoint.y },
+        'source'
+      );
+      const targetHandle = getClosestHandleToPoint(
+        targetNode,
+        { x: section.endPoint.x, y: section.endPoint.y },
+        'target'
+      );
+      return { ...rel, sourceHandle, targetHandle };
+    }));
+  }, [classes, relations]);
+
   return (
     <div style={{ display: 'flex', height: '100vh' }}>
       {/* Diagrama principal */}
@@ -890,6 +939,22 @@ export default function UMLDiagram() {
               style={{ display: 'none' }}
             />
           </label>
+
+          {/* Botón de layout automático ELK */}
+          <button
+            onClick={runElkLayoutAndUpdateHandles}
+            style={{
+              background: '#f59e42',
+              color: 'white',
+              border: 'none',
+              borderRadius: 4,
+              padding: '8px 12px',
+              cursor: 'pointer',
+              fontSize: 14
+            }}
+          >
+            Auto Layout (ELK)
+          </button>
         </div>
       </div>
 
