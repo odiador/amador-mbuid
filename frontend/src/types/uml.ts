@@ -52,6 +52,16 @@ export interface UMLRelation {
   label?: string;
   sourceCardinality?: string; // ej: "1", "0..1", "1..*", "*"
   targetCardinality?: string;
+  // Información sobre handles específicos usados en la conexión
+  sourceHandle?: string; // ej: "top-1", "right-2", etc.
+  targetHandle?: string; // ej: "target-bottom-3", etc.
+  // Opciones de estilo visual personalizadas
+  visualStyle?: {
+    edgeType?: 'straight' | 'default' | 'step' | 'animated' | 'aggregation' | 'composition' | 'inheritance';
+    color?: string;
+    strokeWidth?: number;
+    strokeDasharray?: string;
+  };
 }
 
 export interface UMLModel {

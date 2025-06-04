@@ -5,8 +5,7 @@ export default function Navigation() {
 
   const navItems = [
     { path: '/uml-editor', label: 'Editor UML', icon: '📊' },
-    { path: '/ui-generator', label: 'Generador de UI', icon: '🎨' },
-    { path: '/test-full', label: 'Test Resize', icon: '🔧' }
+    { path: '/ui-generator', label: 'Generador de UI', icon: '🎨' }
   ];
 
   return (

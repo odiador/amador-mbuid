@@ -2,8 +2,6 @@ import { Navigate, Route, BrowserRouter as Router, Routes } from 'react-router-d
 import Navigation from './components/Navigation';
 import UIGeneratorPage from './pages/UIGeneratorPage';
 import UMLEditorPage from './pages/UMLEditorPage';
-import { TestResize } from './test-resize';
-import { TestResizeConnections } from './test-resize-connections';
 
 function App() {
   return (
@@ -14,8 +12,6 @@ function App() {
           <Route path="/" element={<Navigate to="/uml-editor" replace />} />
           <Route path="/uml-editor" element={<UMLEditorPage />} />
           <Route path="/ui-generator" element={<UIGeneratorPage />} />
-          <Route path="/test-resize" element={<TestResize />} />
-          <Route path="/test-full" element={<TestResizeConnections />} />
         </Routes>
       </div>
     </Router>

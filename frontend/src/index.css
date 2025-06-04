@@ -97,3 +97,122 @@ body {
 .react-flow__resize-control.handle {
   z-index: 101 !important;
 }
+
+/* Enhanced Connection Handles Styles */
+.uml-connection-handle {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  cursor: crosshair !important;
+  border-radius: 50% !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+}
+
+.uml-connection-handle:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  transform: scale(1.3) !important;
+}
+
+.uml-connection-handle.source {
+  z-index: 15 !important;
+}
+
+.uml-connection-handle.target {
+  z-index: 14 !important;
+}
+
+/* Handle color themes */
+.handle-top {
+  background: linear-gradient(135deg, #3b82f6, #1d4ed8) !important;
+  border: 2px solid rgba(255, 255, 255, 0.9) !important;
+}
+
+.handle-right {
+  background: linear-gradient(135deg, #10b981, #047857) !important;
+  border: 2px solid rgba(255, 255, 255, 0.9) !important;
+}
+
+.handle-bottom {
+  background: linear-gradient(135deg, #f59e0b, #d97706) !important;
+  border: 2px solid rgba(255, 255, 255, 0.9) !important;
+}
+
+.handle-left {
+  background: linear-gradient(135deg, #ef4444, #dc2626) !important;
+  border: 2px solid rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Handle visibility states */
+.handle-hidden {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+.handle-subtle {
+  opacity: 0.3 !important;
+}
+
+.handle-visible {
+  opacity: 0.8 !important;
+}
+
+.handle-active {
+  opacity: 1 !important;
+  transform: scale(1.1) !important;
+}
+
+/* Connection guide lines animation */
+@keyframes pulse-connection {
+  0%, 100% {
+    opacity: 0.5;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.05);
+  }
+}
+
+.connection-active .uml-connection-handle {
+  animation: pulse-connection 1.5s ease-in-out infinite;
+}
+
+/* Tooltip improvements */
+.handle-tooltip {
+  position: absolute;
+  background: rgba(0, 0, 0, 0.9);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  white-space: nowrap;
+  z-index: 1000;
+  pointer-events: none;
+  backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Node selection enhancement */
+.react-flow__node.selected .uml-connection-handle {
+  opacity: 0.6 !important;
+}
+
+.react-flow__node.selected .uml-connection-handle:hover {
+  opacity: 1 !important;
+}
+
+/* Prevent handle interference with resize */
+.react-flow__node .react-flow__handle {
+  pointer-events: auto !important;
+}
+
+.react-flow__node:not(.selected) .react-flow__handle {
+  opacity: 0.2 !important;
+}
+
+/* Ensure resize handles have highest priority */
+.react-flow__resize-control {
+  z-index: 200 !important;
+}
+
+.react-flow__resize-control .react-flow__resize-control-handle {
+  z-index: 201 !important;
+}

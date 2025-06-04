@@ -5,7 +5,6 @@ import ReactFlow, {
   Controls,
   Edge,
   EdgeChange,
-  MarkerType,
   Node,
   NodeChange,
   applyNodeChanges,
@@ -24,11 +23,32 @@ import {
 } from '../utils/umlHelpers';
 import { CodeGenerator } from './CodeGenerator';
 import { RelationshipPanel } from './RelationshipPanel';
+import { EdgeEditPanel } from './EdgeEditPanel';
 import ResizableUMLNode from './ResizableUMLNode';
+import { 
+  StraightEdge, 
+  CustomBezierEdge, 
+  StepEdge, 
+  AnimatedEdge,
+  AggregationEdge,
+  CompositionEdge,
+  InheritanceEdge
+} from './CustomEdges';
 
 // Tipos de nodos personalizados
 const nodeTypes = {
   umlClass: ResizableUMLNode,
+};
+
+// Tipos de edges personalizados
+const edgeTypes = {
+  straight: StraightEdge,
+  default: CustomBezierEdge,
+  step: StepEdge,
+  animated: AnimatedEdge,
+  aggregation: AggregationEdge,
+  composition: CompositionEdge,
+  inheritance: InheritanceEdge,
 };
 
 // Función para convertir UMLRelation a React Flow Edge con estilos específicos
@@ -37,19 +57,47 @@ const relationToEdge = (relation: UMLRelation, isSelected: boolean = false): Edg
     id: relation.id,
     source: relation.source,
     target: relation.target,
+    // Usar handles específicos si están disponibles
+    sourceHandle: relation.sourceHandle,
+    targetHandle: relation.targetHandle,
     label: relation.label || '',
-    type: 'default',
-    selected: isSelected
+    selected: isSelected,
+    labelStyle: { 
+      fontSize: 14, 
+      fontWeight: 'bold',
+      fill: '#374151',
+      background: 'rgba(255, 255, 255, 0.9)',
+      padding: '4px 8px',
+      borderRadius: '4px',
+      border: '1px solid #d1d5db'
+    }
   };
 
-  // Configurar estilos según el tipo de relación UML
+  // Si hay estilo visual personalizado, usarlo
+  if (relation.visualStyle) {
+    return {
+      ...baseEdge,
+      type: relation.visualStyle.edgeType || 'straight',
+      style: {
+        stroke: relation.visualStyle.color || '#374151',
+        strokeWidth: relation.visualStyle.strokeWidth || 1.5,
+        ...(relation.visualStyle.strokeDasharray && { strokeDasharray: relation.visualStyle.strokeDasharray })
+      },
+      data: { 
+        relation,
+        sourceCardinality: relation.sourceCardinality,
+        targetCardinality: relation.targetCardinality
+      }
+    };
+  }
+
+  // Configurar estilos según el tipo de relación UML (por defecto)
   switch (relation.type) {
     case 'inheritance':
       return {
         ...baseEdge,
-        markerEnd: { type: MarkerType.Arrow, width: 20, height: 20 },
+        type: 'inheritance',
         style: { stroke: '#2563eb', strokeWidth: 2 },
-        labelStyle: { fontSize: 12, fontWeight: 'bold' },
         data: { 
           relation,
           sourceCardinality: relation.sourceCardinality,
@@ -60,9 +108,8 @@ const relationToEdge = (relation: UMLRelation, isSelected: boolean = false): Edg
     case 'composition':
       return {
         ...baseEdge,
-        markerEnd: { type: MarkerType.Arrow, width: 15, height: 15 },
+        type: 'composition',
         style: { stroke: '#7c2d12', strokeWidth: 2 },
-        labelStyle: { fontSize: 12 },
         data: {
           relation,
           sourceCardinality: relation.sourceCardinality,
@@ -73,9 +120,8 @@ const relationToEdge = (relation: UMLRelation, isSelected: boolean = false): Edg
     case 'aggregation':
       return {
         ...baseEdge,
-        markerEnd: { type: MarkerType.Arrow, width: 15, height: 15 },
+        type: 'aggregation',
         style: { stroke: '#059669', strokeWidth: 2 },
-        labelStyle: { fontSize: 12 },
         data: { 
           relation,
           sourceCardinality: relation.sourceCardinality,
@@ -86,9 +132,8 @@ const relationToEdge = (relation: UMLRelation, isSelected: boolean = false): Edg
     case 'dependency':
       return {
         ...baseEdge,
-        markerEnd: { type: MarkerType.Arrow, width: 12, height: 12 },
+        type: 'animated',
         style: { stroke: '#6b7280', strokeWidth: 1, strokeDasharray: '5,5' },
-        labelStyle: { fontSize: 11, fontStyle: 'italic' },
         data: { 
           relation,
           sourceCardinality: relation.sourceCardinality,
@@ -100,9 +145,8 @@ const relationToEdge = (relation: UMLRelation, isSelected: boolean = false): Edg
     default:
       return {
         ...baseEdge,
-        markerEnd: { type: MarkerType.Arrow, width: 12, height: 12 },
+        type: 'straight',
         style: { stroke: '#374151', strokeWidth: 1.5 },
-        labelStyle: { fontSize: 12 },
         data: { 
           relation,
           sourceCardinality: relation.sourceCardinality,
@@ -190,6 +234,7 @@ export default function UMLDiagram() {
   const [relations, setRelations] = useState<UMLRelation[]>(initialRelations);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(null);
+  const [selectedEdge, setSelectedEdge] = useState<Edge | null>(null);
   const [newAttribute, setNewAttribute] = useState('');
   const [newMethod, setNewMethod] = useState('');
 
@@ -197,15 +242,117 @@ export default function UMLDiagram() {
   const [nodes, setNodes] = useState<Node[]>([]);
   const [edges, setEdges] = useState<Edge[]>([]);
 
-  // Sincronizar clases con nodos de ReactFlow
-  React.useEffect(() => {
-    const reactFlowNodes: Node[] = classes.map((umlClass) => ({
+  // Edge editing functions
+  const onEdgeTypeChange = useCallback((edgeId: string, newType: string) => {
+    // Actualizar el estado de edges inmediatamente para feedback visual
+    setEdges((eds) =>
+      eds.map((edge) =>
+        edge.id === edgeId
+          ? { ...edge, type: newType }
+          : edge
+      )
+    );
+    
+    // Actualizar la relación correspondiente con el nuevo estilo visual
+    setRelations((rels) =>
+      rels.map((rel) =>
+        rel.id === edgeId
+          ? {
+              ...rel,
+              visualStyle: {
+                ...rel.visualStyle,
+                edgeType: newType as any
+              }
+            }
+          : rel
+      )
+    );
+    // selectedEdge será actualizado automáticamente por el useEffect
+  }, []);
+
+  const onEdgeStyleChange = useCallback((edgeId: string, newStyle: any) => {
+    // Actualizar el estado de edges inmediatamente
+    setEdges((eds) =>
+      eds.map((edge) =>
+        edge.id === edgeId
+          ? { ...edge, style: { ...edge.style, ...newStyle } }
+          : edge
+      )
+    );
+    
+    // Actualizar la relación correspondiente
+    setRelations((rels) =>
+      rels.map((rel) =>
+        rel.id === edgeId
+          ? {
+              ...rel,
+              visualStyle: {
+                ...rel.visualStyle,
+                color: newStyle.stroke || rel.visualStyle?.color,
+                strokeWidth: newStyle.strokeWidth || rel.visualStyle?.strokeWidth,
+                ...(newStyle.strokeDasharray && { strokeDasharray: newStyle.strokeDasharray })
+              }
+            }
+          : rel
+      )
+    );
+    // selectedEdge será actualizado automáticamente por el useEffect
+  }, []);
+
+  const onDeleteEdge = useCallback((edgeId: string) => {
+    setEdges((eds) => eds.filter((edge) => edge.id !== edgeId));
+    setRelations((rels) => rels.filter((rel) => rel.id !== edgeId));
+    setSelectedEdgeId(null); // Esto hará que selectedEdge se actualice automáticamente
+  }, []);
+
+  const onLabelChange = useCallback((edgeId: string, label: string) => {
+    // Actualizar el estado de edges inmediatamente
+    setEdges((eds) =>
+      eds.map((edge) =>
+        edge.id === edgeId
+          ? { ...edge, label }
+          : edge
+      )
+    );
+    
+    // Actualizar la relación correspondiente
+    setRelations((rels) =>
+      rels.map((rel) =>
+        rel.id === edgeId
+          ? { ...rel, label }
+          : rel
+      )
+    );
+    // selectedEdge será actualizado automáticamente por el useEffect
+  }, []);
+
+  // Función separada para manejar cambios de dimensiones cuando termine el resize
+  const handleResizeEnd = useCallback((nodeId: string, dimensions: { width: number; height: number }) => {
+    setClasses(prev => 
+      prev.map(cls => 
+        cls.id === nodeId 
+          ? { 
+              ...cls, 
+              dimensions: { 
+                width: Math.round(dimensions.width), 
+                height: Math.round(dimensions.height) 
+              } 
+            }
+          : cls
+      )
+    );
+  }, []);
+
+  // Sincronizar clases con nodos de ReactFlow - usar React.useMemo para evitar recálculos
+  const reactFlowNodes = React.useMemo(() => {
+    return classes.map((umlClass) => ({
       id: umlClass.id,
       type: 'umlClass',
       position: umlClass.position,
       data: { 
         umlClass,
-        isSelected: selectedNodeId === umlClass.id 
+        isSelected: selectedNodeId === umlClass.id,
+        onResizeEnd: handleResizeEnd // Pasar función de resize
       },
       style: {
         width: umlClass.dimensions?.width || 200,
@@ -221,16 +368,23 @@ export default function UMLDiagram() {
         height: '8px'
       }
     }));
-    setNodes(reactFlowNodes);
-  }, [classes, selectedNodeId]);
+  }, [classes, selectedNodeId, handleResizeEnd]);
 
-  // Sincronizar relaciones con edges
-  React.useEffect(() => {
-    const reactFlowEdges: Edge[] = relations.map(relation => 
+  // Sincronizar relaciones con edges - usar React.useMemo para evitar recálculos
+  const reactFlowEdges = React.useMemo(() => {
+    return relations.map(relation => 
       relationToEdge(relation, selectedEdgeId === relation.id)
     );
-    setEdges(reactFlowEdges);
   }, [relations, selectedEdgeId]);
+
+  // Efectos para actualizar estados - Simplificado para evitar bucles
+  React.useEffect(() => {
+    setNodes(reactFlowNodes);
+  }, [reactFlowNodes]);
+
+  React.useEffect(() => {
+    setEdges(reactFlowEdges);
+  }, [reactFlowEdges]);
 
   // Obtener la clase seleccionada
   const selectedClass = selectedNodeId ? classes.find(c => c.id === selectedNodeId) : null;
@@ -241,35 +395,16 @@ export default function UMLDiagram() {
   // Manejadores de cambios en nodos y edges
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
-      console.log('Node changes:', changes);
-      
       // Aplicar cambios a los nodos de ReactFlow primero
       setNodes((nds) => applyNodeChanges(changes, nds));
       
-      // Sincronizar cambios importantes con el estado de clases
+      // Sincronizar solo cambios que NO causarán re-render del useEffect
       changes.forEach(change => {
         if (change.type === 'position' && change.position) {
-          console.log('Position change:', change.id, change.position);
           setClasses(prev => 
             prev.map(cls => 
               cls.id === change.id 
                 ? { ...cls, position: change.position! }
-                : cls
-            )
-          );
-        } else if (change.type === 'dimensions' && change.dimensions) {
-          // Manejar cambios de redimensionamiento
-          console.log('Dimensions change:', change.id, change.dimensions);
-          setClasses(prev => 
-            prev.map(cls => 
-              cls.id === change.id 
-                ? { 
-                    ...cls, 
-                    dimensions: { 
-                      width: Math.round(change.dimensions!.width), 
-                      height: Math.round(change.dimensions!.height) 
-                    } 
-                  }
                 : cls
             )
           );
@@ -282,6 +417,8 @@ export default function UMLDiagram() {
             setSelectedNodeId(null);
           }
         }
+        // REMOVIDO: dimension changes para evitar loop infinito
+        // Las dimensiones se sincronizarán cuando termine el resize
       });
     },
     [selectedNodeId]
@@ -289,8 +426,6 @@ export default function UMLDiagram() {
 
   const onEdgesChange = useCallback(
     (changes: EdgeChange[]) => {
-      console.log('Edge changes:', changes);
-      
       // Aplicar cambios a los edges de ReactFlow
       setEdges((eds) => applyEdgeChanges(changes, eds));
       
@@ -308,6 +443,16 @@ export default function UMLDiagram() {
     },
     [selectedEdgeId]
   );
+
+  // Derivar selectedEdge del estado actual de edges de forma reactiva
+  React.useEffect(() => {
+    if (selectedEdgeId) {
+      const edge = edges.find(e => e.id === selectedEdgeId);
+      setSelectedEdge(edge || null);
+    } else {
+      setSelectedEdge(null);
+    }
+  }, [selectedEdgeId, edges]);
 
   // Manejar cambios de selección
   const onSelectionChange = useCallback(
@@ -337,7 +482,10 @@ export default function UMLDiagram() {
           target: connection.target,
           label: '',
           sourceCardinality: '',
-          targetCardinality: ''
+          targetCardinality: '',
+          // Capturar información de handles específicos
+          sourceHandle: connection.sourceHandle || undefined,
+          targetHandle: connection.targetHandle || undefined
         };
         
         setRelations(prev => [...prev, newRelation]);
@@ -367,6 +515,7 @@ export default function UMLDiagram() {
   const onEdgeClick = useCallback((_: React.MouseEvent, edge: Edge) => {
     setSelectedEdgeId(edge.id);
     setSelectedNodeId(null);
+    setSelectedEdge(edge);
   }, []);
 
   // Agregar nueva clase
@@ -555,6 +704,7 @@ export default function UMLDiagram() {
           nodes={nodes}
           edges={edges}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
@@ -589,11 +739,36 @@ export default function UMLDiagram() {
             maxWidth: '300px',
             zIndex: 1000
           }}>
-            <div><strong>Debug Info:</strong></div>
+            <div><strong>Debug Info (Node):</strong></div>
             <div>Selected: {selectedClass.name}</div>
             <div>Dimensions: {selectedClass.dimensions?.width || 'undefined'} x {selectedClass.dimensions?.height || 'undefined'}</div>
             <div>Position: {selectedClass.position.x}, {selectedClass.position.y}</div>
             <div>Node Count: {nodes.length}</div>
+          </div>
+        )}
+
+        {/* Panel de Debug para Edge */}
+        {selectedEdge && (
+          <div style={{
+            position: 'absolute',
+            bottom: 10,
+            right: 10,
+            background: 'rgba(0,0,139,0.8)',
+            color: 'white',
+            padding: '10px',
+            borderRadius: '8px',
+            fontSize: '12px',
+            maxWidth: '300px',
+            zIndex: 1000
+          }}>
+            <div><strong>Debug Info (Edge):</strong></div>
+            <div>Selected: {selectedEdge.id}</div>
+            <div>Type: {selectedEdge.type || 'default'}</div>
+            <div>Source: {selectedEdge.source} → Target: {selectedEdge.target}</div>
+            <div>Source Handle: {selectedEdge.sourceHandle || 'none'}</div>
+            <div>Target Handle: {selectedEdge.targetHandle || 'none'}</div>
+            <div>Label: {selectedEdge.label || 'none'}</div>
+            <div>Edge Count: {edges.length}</div>
           </div>
         )}
 
@@ -653,18 +828,6 @@ export default function UMLDiagram() {
               style={{ display: 'none' }}
             />
           </label>
-
-          {/* Botón de instrucciones */}
-          <div style={{
-            background: '#f59e0b',
-            color: 'white',
-            padding: '8px 12px',
-            borderRadius: 4,
-            fontSize: 12,
-            maxWidth: '200px'
-          }}>
-            💡 Selecciona un nodo y arrastra las esquinas azules para redimensionar
-          </div>
         </div>
       </div>
 
@@ -886,6 +1049,17 @@ export default function UMLDiagram() {
           onUpdateRelation={updateUMLRelation}
           onDeleteRelation={deleteRelation}
           onClose={() => setSelectedEdgeId(null)}
+        />
+      )}
+
+      {/* Panel Lateral - Edge Editing */}
+      {selectedEdge && (
+        <EdgeEditPanel
+          selectedEdge={selectedEdge}
+          onEdgeTypeChange={onEdgeTypeChange}
+          onEdgeStyleChange={onEdgeStyleChange}
+          onLabelChange={onLabelChange}
+          onDeleteEdge={onDeleteEdge}
         />
       )}
     </div>
